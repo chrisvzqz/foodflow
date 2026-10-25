@@ -19,7 +19,7 @@ Future versions will explore features such as expiration date tracking, shopping
 
 - **Frontend:** React, JavaScript
 - **Backend:** Python, FastAPI
-- **Database:** SQLite
+- **Database:** PostgreSQL
 
 ## Status
 
