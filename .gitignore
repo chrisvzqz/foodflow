@@ -228,3 +228,5 @@ __marimo__/
 # Node / React
 node_modules/
 dist/
+
+/AGENTS.md
