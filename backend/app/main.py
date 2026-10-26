@@ -3,6 +3,8 @@ from psycopg import Connection
 
 from app.database import get_connection
 
+from app.schemas import ProductCreate, ProductResponse
+
 app = FastAPI()
 
 
@@ -18,3 +20,50 @@ def check_database(connection: Connection = Depends(get_connection)):
         result = cursor.fetchone()
 
     return {"database": "connected", "result": result[0]}
+
+
+@app.get("/products", response_model=list[ProductResponse])
+def get_products(connection: Connection = Depends(get_connection)):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """SELECT id, name, unit, created_at, is_active
+            FROM products
+            WHERE is_active = TRUE
+            ORDER BY id;"""
+        )
+        products = cursor.fetchall()
+
+    products_response = []
+    for p in products:
+        product_data = {
+            "id": p[0],
+            "name": p[1],
+            "unit": p[2],
+            "created_at": p[3],
+            "is_active": p[4]
+        }
+        products_response.append(product_data)
+
+    return products_response
+
+
+@app.post("/products", status_code=201, response_model=ProductResponse)
+def create_product(product: ProductCreate, connection: Connection = Depends(get_connection)):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """INSERT INTO products (name, unit)
+            VALUES (%s, %s)
+            RETURNING id, name, unit, is_active, created_at""",
+            (product.name, product.unit)
+        )
+
+        created_product = cursor.fetchone()
+        connection.commit()
+    
+    return {
+        "id": created_product[0],
+        "name": created_product[1],
+        "unit": created_product[2],
+        "is_active": created_product[3],
+        "created_at": created_product[4],
+    }
