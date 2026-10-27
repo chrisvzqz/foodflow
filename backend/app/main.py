@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from psycopg import Connection
 
 from app.database import get_connection
@@ -66,4 +66,30 @@ def create_product(product: ProductCreate, connection: Connection = Depends(get_
         "unit": created_product[2],
         "is_active": created_product[3],
         "created_at": created_product[4],
+    }
+
+
+@app.get("/products/{product_id}", response_model=ProductResponse)
+def show_product(product_id: int, connection: Connection = Depends(get_connection)):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id, name, unit, is_active, created_at
+            FROM products
+            WHERE id = %s AND is_active =TRUE
+            """,
+            (product_id,)
+        )
+
+        product = cursor.fetchone()
+
+    if product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    return {
+        "id": product[0],
+        "name": product[1],
+        "unit": product[2],
+        "is_active": product[3],
+        "created_at": product[4],
     }
