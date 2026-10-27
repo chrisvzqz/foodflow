@@ -3,7 +3,7 @@ from psycopg import Connection
 
 from app.database import get_connection
 
-from app.schemas import ProductCreate, ProductResponse
+from app.schemas import ProductCreate, ProductResponse, ProductUpdate
 
 app = FastAPI()
 
@@ -92,4 +92,33 @@ def show_product(product_id: int, connection: Connection = Depends(get_connectio
         "unit": product[2],
         "is_active": product[3],
         "created_at": product[4],
+    }
+
+
+@app.put("/products/{product_id}", response_model=ProductResponse)
+def update_product(product_id: int, product: ProductUpdate, connection: Connection = Depends(get_connection)):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            UPDATE products
+            SET name = %s, unit = %s
+            WHERE id = %s AND is_active = TRUE
+            RETURNING id, name, unit, is_active, created_at
+            """,
+            (product.name, product.unit, product_id)
+        )
+
+        product_updated = cursor.fetchone()
+
+    if product_updated is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    connection.commit()
+
+    return {
+        "id": product_updated[0],
+        "name": product_updated[1],
+        "unit": product_updated[2],
+        "is_active": product_updated[3],
+        "created_at": product_updated[4],
     }
