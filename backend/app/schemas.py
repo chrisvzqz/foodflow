@@ -13,3 +13,9 @@ class ProductResponse(BaseModel):
     unit: str
     is_active: bool
     created_at: datetime
+
+class ProductUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str = Field(min_length=1, max_length=100)
+    unit: str = Field(min_length=1, max_length=30)
