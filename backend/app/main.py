@@ -3,7 +3,7 @@ from psycopg import Connection
 
 from app.database import get_connection
 
-from app.schemas import ProductCreate, ProductResponse, ProductUpdate
+from app.schemas import ProductCreate, ProductResponse, ProductUpdate, InventoryItemResponse
 
 app = FastAPI()
 
@@ -180,3 +180,41 @@ def restore_product(product_id: int, connection: Connection = Depends(get_connec
         "is_active": product_updated[3],
         "created_at": product_updated[4],
     }
+
+
+@app.get("/inventory", response_model=list[InventoryItemResponse])
+def get_inventory(connection: Connection = Depends(get_connection)):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT
+                i.id AS inventory_item_id,
+                p.id AS product_id,
+                p.name,
+                p.unit,
+                i.location,
+                i.quantity
+            FROM inventory_items AS i
+            INNER JOIN products AS p
+                ON i.product_id = p.id
+            WHERE p.is_active = TRUE
+            ORDER BY i.id
+            """
+        )
+
+        inventory = cursor.fetchall()
+
+    inventory_response = []
+    
+    for p in inventory:
+        product_data = {
+            "inventory_item_id": p[0],
+            "product_id": p[1],
+            "name": p[2],
+            "unit": p[3],
+            "location": p[4],
+            "quantity": p[5]
+        }
+        inventory_response.append(product_data)
+
+    return inventory_response
