@@ -122,3 +122,61 @@ def update_product(product_id: int, product: ProductUpdate, connection: Connecti
         "is_active": product_updated[3],
         "created_at": product_updated[4],
     }
+
+
+@app.post("/products/{product_id}/archive", response_model=ProductResponse)
+def archive_product(product_id: int, connection: Connection = Depends(get_connection)):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            UPDATE products
+            SET is_active = FALSE
+            WHERE id = %s
+            RETURNING id, name, unit, is_active, created_at
+            """,
+            (product_id,)
+        )
+
+        product_updated = cursor.fetchone()
+
+    if product_updated is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    connection.commit()
+
+    return {
+        "id": product_updated[0],
+        "name": product_updated[1],
+        "unit": product_updated[2],
+        "is_active": product_updated[3],
+        "created_at": product_updated[4],
+    }
+
+
+@app.post("/products/{product_id}/restore", response_model=ProductResponse)
+def restore_product(product_id: int, connection: Connection = Depends(get_connection)):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            UPDATE products
+            SET is_active = TRUE
+            WHERE id = %s
+            RETURNING id, name, unit, is_active, created_at
+            """,
+            (product_id,)
+        )
+
+        product_updated = cursor.fetchone()
+
+    if product_updated is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    connection.commit()
+
+    return {
+        "id": product_updated[0],
+        "name": product_updated[1],
+        "unit": product_updated[2],
+        "is_active": product_updated[3],
+        "created_at": product_updated[4],
+    }
