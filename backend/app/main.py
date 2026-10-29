@@ -3,7 +3,7 @@ from psycopg import Connection
 
 from app.database import get_connection
 
-from app.schemas import ProductCreate, ProductResponse, ProductUpdate, InventoryItemResponse
+from app.schemas import ProductCreate, ProductResponse, ProductUpdate, InventoryItemResponse, InventoryEntryCreate
 
 app = FastAPI()
 
@@ -218,3 +218,53 @@ def get_inventory(connection: Connection = Depends(get_connection)):
         inventory_response.append(product_data)
 
     return inventory_response
+
+
+@app.post("/inventory/entries", response_model=InventoryItemResponse)
+def create_inventory_entry(entry: InventoryEntryCreate, connection: Connection = Depends(get_connection)):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id, name, unit
+            FROM products
+            WHERE id = %s AND is_active = TRUE
+            """,
+            (entry.product_id,)
+        )
+
+        product = cursor.fetchone()
+        if product is None:
+            raise HTTPException(status_code=404, detail="Product not found")
+
+        cursor.execute(
+            """
+            INSERT INTO inventory_items (product_id, location, quantity)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (product_id, location)
+            DO UPDATE
+            SET quantity = inventory_items.quantity + EXCLUDED.quantity
+            RETURNING id, product_id, location, quantity
+            """,
+            (entry.product_id, entry.location, entry.quantity)
+        )
+
+        inventory_item = cursor.fetchone()
+
+        cursor.execute(
+            """
+            INSERT INTO inventory_movements (inventory_item_id, type, quantity_change)
+            VALUES (%s, 'entry', %s)
+            """,
+            (inventory_item[0], entry.quantity),
+        )
+
+    connection.commit()
+
+    return {
+        "inventory_item_id": inventory_item[0],
+        "product_id": inventory_item[1],
+        "name": product[1],
+        "unit": product[2],
+        "location": inventory_item[2],
+        "quantity": inventory_item[3]
+    }
