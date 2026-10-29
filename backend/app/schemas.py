@@ -30,3 +30,8 @@ class InventoryItemResponse(BaseModel):
     unit: str
     location: Literal["fridge", "freezer", "pantry"]
     quantity: Decimal
+
+class InventoryEntryCreate(BaseModel):
+    product_id: int = Field(gt=0)
+    location: Literal["fridge", "freezer", "pantry"]
+    quantity: Decimal = Field(gt=0, max_digits=12, decimal_places=3)
