@@ -129,6 +129,39 @@ def archive_product(product_id: int, connection: Connection = Depends(get_connec
     with connection.cursor() as cursor:
         cursor.execute(
             """
+            SELECT id
+            FROM products
+            WHERE id = %s
+            FOR UPDATE
+            """,
+            (product_id,)
+        )
+
+        product = cursor.fetchone()
+
+        if product is None:
+            raise HTTPException(status_code=404, detail="Product not found")
+
+        cursor.execute(
+            """
+            SELECT id
+            FROM inventory_items
+            WHERE product_id = %s AND quantity > 0
+            LIMIT 1
+            """,
+            (product_id,),
+        )
+
+        remaining_stock = cursor.fetchone()
+
+        if remaining_stock is not None:
+            raise HTTPException(
+                status_code=409,
+                detail="Cannot archive a product with remaining stock",
+            )
+        
+        cursor.execute(
+            """
             UPDATE products
             SET is_active = FALSE
             WHERE id = %s
@@ -228,6 +261,7 @@ def create_inventory_entry(entry: InventoryEntryCreate, connection: Connection =
             SELECT id, name, unit
             FROM products
             WHERE id = %s AND is_active = TRUE
+            FOR UPDATE
             """,
             (entry.product_id,)
         )
