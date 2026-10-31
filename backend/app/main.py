@@ -3,7 +3,7 @@ from psycopg import Connection
 
 from app.database import get_connection
 
-from app.schemas import ProductCreate, ProductResponse, ProductUpdate, InventoryItemResponse, InventoryEntryCreate, InventoryConsumptionCreate
+from app.schemas import ProductCreate, ProductResponse, ProductUpdate, InventoryItemResponse, InventoryEntryCreate, InventoryConsumptionCreate, InventoryWasteCreate
 
 app = FastAPI()
 
@@ -344,6 +344,60 @@ def create_inventory_consumption(consumption: InventoryConsumptionCreate, connec
             VALUES (%s, 'consumption', %s)
             """,
             (inventory_item[0], -consumption.quantity)
+        )
+
+    connection.commit()
+
+    return {
+        "inventory_item_id": inventory_item[0],
+        "product_id": inventory_item[1],
+        "name": product[1],
+        "unit": product[2],
+        "location": inventory_item[2],
+        "quantity": inventory_item[3]
+    }
+
+
+@app.post("/inventory/wastes", response_model=InventoryItemResponse)
+def create_inventory_waste(waste: InventoryWasteCreate, connection: Connection = Depends(get_connection)):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id, name, unit
+            FROM products
+            WHERE id = %s AND is_active = TRUE
+            """,
+            (waste.product_id,),
+        )
+
+        product = cursor.fetchone()
+
+        if product is None:
+            raise HTTPException(status_code=404, detail="Product not found")
+
+        cursor.execute(
+            """
+            UPDATE inventory_items
+            SET quantity = quantity - %s
+            WHERE product_id = %s
+                AND location = %s
+                AND quantity >= %s
+            RETURNING id, product_id, location, quantity
+            """,
+            (waste.quantity, waste.product_id, waste.location, waste.quantity)
+        )
+
+        inventory_item = cursor.fetchone()
+
+        if inventory_item is None:
+            raise HTTPException(status_code=409, detail="Insufficient stock at this location")
+
+        cursor.execute(
+            """
+            INSERT INTO inventory_movements (inventory_item_id, type, quantity_change)
+            VALUES (%s, 'waste', %s)
+            """,
+            (inventory_item[0], -waste.quantity)
         )
 
     connection.commit()
