@@ -3,7 +3,7 @@ from psycopg import Connection
 
 from app.database import get_connection
 
-from app.schemas import ProductCreate, ProductResponse, ProductUpdate, InventoryItemResponse, InventoryEntryCreate, InventoryConsumptionCreate, InventoryWasteCreate
+from app.schemas import ProductCreate, ProductResponse, ProductUpdate, InventoryItemResponse, InventoryEntryCreate, InventoryConsumptionCreate, InventoryWasteCreate, InventoryAdjustmentCreate
 
 app = FastAPI()
 
@@ -399,6 +399,74 @@ def create_inventory_waste(waste: InventoryWasteCreate, connection: Connection =
             """,
             (inventory_item[0], -waste.quantity)
         )
+
+    connection.commit()
+
+    return {
+        "inventory_item_id": inventory_item[0],
+        "product_id": inventory_item[1],
+        "name": product[1],
+        "unit": product[2],
+        "location": inventory_item[2],
+        "quantity": inventory_item[3]
+    }
+
+
+@app.post("/inventory/adjustments", response_model=InventoryItemResponse)
+def create_inventory_adjustment(adjustment: InventoryAdjustmentCreate, connection: Connection = Depends(get_connection)):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id, name, unit
+            FROM products
+            WHERE id = %s AND is_active = TRUE
+            FOR UPDATE
+            """,
+            (adjustment.product_id,)
+        )
+
+        product = cursor.fetchone()
+
+        if product is None:
+            raise HTTPException(status_code=404, detail="Product not found")
+
+        cursor.execute(
+            """
+            SELECT id, product_id, location, quantity
+            FROM inventory_items
+            WHERE product_id = %s AND location = %s
+            FOR UPDATE
+            """,
+            (adjustment.product_id, adjustment.location)
+        )
+
+        inventory_item = cursor.fetchone()
+
+        if inventory_item is None:
+            raise HTTPException(status_code=404, detail="Inventory item not found")
+
+        quantity_change = adjustment.quantity - inventory_item[3]
+
+        if quantity_change != 0:
+            cursor.execute(
+                """
+                UPDATE inventory_items
+                SET quantity = %s
+                WHERE id = %s
+                RETURNING id, product_id, location, quantity
+                """,
+                (adjustment.quantity, inventory_item[0])
+            )
+
+            inventory_item = cursor.fetchone()
+
+            cursor.execute(
+                """
+                INSERT INTO inventory_movements (inventory_item_id, type, quantity_change)
+                VALUES (%s, 'adjustment', %s)
+                """,
+                (inventory_item[0], quantity_change)
+            )
 
     connection.commit()
 
