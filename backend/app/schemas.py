@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal
@@ -50,3 +50,19 @@ class InventoryAdjustmentCreate(BaseModel):
     product_id: int = Field(gt=0)
     location: Literal["fridge", "freezer", "pantry"]
     quantity: Decimal = Field(ge=0, max_digits=12, decimal_places=3)
+
+class InventoryTransferCreate(BaseModel):
+    product_id: int = Field(gt=0)
+    source_location: Literal["fridge", "freezer", "pantry"]
+    destination_location: Literal["fridge", "freezer", "pantry"]
+    quantity: Decimal = Field(gt=0, max_digits=12, decimal_places=3)
+
+    @model_validator(mode="after")
+    def validate_locations(self):
+        if self.source_location == self.destination_location:
+            raise ValueError("Source and destination must be different")
+        return self
+
+class InventoryTransferResponse(BaseModel):
+    source: InventoryItemResponse
+    destination: InventoryItemResponse

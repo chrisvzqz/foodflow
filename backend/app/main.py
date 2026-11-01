@@ -3,7 +3,7 @@ from psycopg import Connection
 
 from app.database import get_connection
 
-from app.schemas import ProductCreate, ProductResponse, ProductUpdate, InventoryItemResponse, InventoryEntryCreate, InventoryConsumptionCreate, InventoryWasteCreate, InventoryAdjustmentCreate
+from app.schemas import ProductCreate, ProductResponse, ProductUpdate, InventoryItemResponse, InventoryEntryCreate, InventoryConsumptionCreate, InventoryWasteCreate, InventoryAdjustmentCreate, InventoryTransferCreate, InventoryTransferResponse
 
 app = FastAPI()
 
@@ -477,4 +477,91 @@ def create_inventory_adjustment(adjustment: InventoryAdjustmentCreate, connectio
         "unit": product[2],
         "location": inventory_item[2],
         "quantity": inventory_item[3]
+    }
+
+
+@app.post("/inventory/transfers", response_model=InventoryTransferResponse)
+def create_inventory_transfer(transfer: InventoryTransferCreate, connection: Connection = Depends(get_connection)):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id, name, unit
+            FROM products
+            WHERE id = %s AND is_active = TRUE
+            FOR UPDATE
+            """,
+            (transfer.product_id,)
+        )
+
+        product = cursor.fetchone()
+
+        if product is None:
+            raise HTTPException(status_code=404, detail="Product not found")
+
+        cursor.execute(
+            """
+            UPDATE inventory_items
+            SET quantity = quantity - %s
+            WHERE product_id = %s
+                AND location = %s
+                AND quantity >= %s
+            RETURNING id, product_id, location, quantity
+            """,
+            (transfer.quantity, transfer.product_id, transfer.source_location, transfer.quantity)
+        )
+
+        source_item = cursor.fetchone()
+
+        if source_item is None:
+            raise HTTPException(status_code=409, detail="Insufficient stock at source location")
+
+        cursor.execute(
+            """
+            INSERT INTO inventory_items (product_id, location, quantity)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (product_id, location)
+            DO UPDATE
+            SET quantity = inventory_items.quantity + EXCLUDED.quantity
+            RETURNING id, product_id, location, quantity
+            """,
+            (transfer.product_id, transfer.destination_location, transfer.quantity)
+        )
+
+        destination_item = cursor.fetchone()
+
+        cursor.execute(
+            """
+            INSERT INTO inventory_movements (inventory_item_id, type, quantity_change)
+            VALUES (%s, 'transfer_out', %s)
+            """,
+            (source_item[0], -transfer.quantity)
+        )
+
+        cursor.execute(
+            """
+            INSERT INTO inventory_movements (inventory_item_id, type, quantity_change)
+            VALUES (%s, 'transfer_in', %s)
+            """,
+            (destination_item[0], transfer.quantity)
+        )
+
+    connection.commit()
+
+    return {
+        "source": {
+            "inventory_item_id": source_item[0],
+            "product_id": source_item[1],
+            "name": product[1],
+            "unit": product[2],
+            "location": source_item[2],
+            "quantity": source_item[3]
+        },
+        "destination": {
+            "inventory_item_id": destination_item[0],
+            "product_id": destination_item[1],
+            "name": product[1],
+            "unit": product[2],
+            "location": destination_item[2],
+            "quantity": destination_item[3]
+        }
     }
