@@ -58,7 +58,28 @@ def create_product(product: ProductCreate, connection: Connection = Depends(get_
         )
 
         created_product = cursor.fetchone()
-        connection.commit()
+
+        if product.initial_inventory is not None:
+            cursor.execute(
+                """
+                INSERT INTO inventory_items (product_id, location, quantity)
+                VALUES (%s, %s, %s)
+                RETURNING id
+                """,
+                (created_product[0], product.initial_inventory.location, product.initial_inventory.quantity)
+            )
+
+            inventory_item = cursor.fetchone()
+
+            cursor.execute(
+                """
+                INSERT INTO inventory_movements (inventory_item_id, type, quantity_change)
+                VALUES (%s, 'entry', %s)
+                """,
+                (inventory_item[0], product.initial_inventory.quantity)
+            )
+        
+    connection.commit()
     
     return {
         "id": created_product[0],

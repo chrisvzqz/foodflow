@@ -4,11 +4,16 @@ from decimal import Decimal
 from typing import Literal
 
 
+class InitialInventoryCreate(BaseModel):
+    location: Literal["fridge", "freezer", "pantry"]
+    quantity: Decimal = Field(gt=0, max_digits=12, decimal_places=3)
+
 class ProductCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     name: str = Field(min_length=1, max_length=100)
     unit: str = Field(min_length=1, max_length=30)
+    initial_inventory: InitialInventoryCreate | None = None
 
 class ProductResponse(BaseModel):
     id: int
