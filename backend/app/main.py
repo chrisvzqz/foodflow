@@ -23,13 +23,19 @@ def check_database(connection: Connection = Depends(get_connection)):
 
 
 @app.get("/products", response_model=list[ProductResponse])
-def get_products(connection: Connection = Depends(get_connection)):
+def get_products(search: str | None = None, is_active: bool = True, connection: Connection = Depends(get_connection)):
+    search_pattern = f"%{search.strip()}%" if search is not None else None
+
     with connection.cursor() as cursor:
         cursor.execute(
-            """SELECT id, name, unit, created_at, is_active
+            """
+            SELECT id, name, unit, created_at, is_active
             FROM products
-            WHERE is_active = TRUE
-            ORDER BY id;"""
+            WHERE is_active = %s
+            AND (%s::text IS NULL OR name ILIKE %s)
+            ORDER BY id
+            """,
+            (is_active, search_pattern, search_pattern)
         )
         products = cursor.fetchall()
 
