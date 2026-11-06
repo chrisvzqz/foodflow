@@ -4,6 +4,7 @@ from psycopg import Connection
 from app.database import get_connection
 
 from app.schemas import ProductCreate, ProductResponse, ProductUpdate, InventoryItemResponse, InventoryEntryCreate, InventoryConsumptionCreate, InventoryWasteCreate, InventoryAdjustmentCreate, InventoryTransferCreate, InventoryTransferResponse
+from typing import Literal
 
 app = FastAPI()
 
@@ -243,7 +244,8 @@ def restore_product(product_id: int, connection: Connection = Depends(get_connec
 
 
 @app.get("/inventory", response_model=list[InventoryItemResponse])
-def get_inventory(connection: Connection = Depends(get_connection)):
+def get_inventory(search: str | None = None, location: Literal["fridge", "freezer", "pantry"] | None = None, connection: Connection = Depends(get_connection)):
+    search_pattern = f"%{search.strip()}%" if search is not None else None
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -258,8 +260,11 @@ def get_inventory(connection: Connection = Depends(get_connection)):
             INNER JOIN products AS p
                 ON i.product_id = p.id
             WHERE p.is_active = TRUE
+                AND (%s::text IS NULL OR p.name ILIKE %s)
+                AND (%s::text IS NULL OR i.location = %s)
             ORDER BY i.id
-            """
+            """,
+            (search_pattern, search_pattern, location, location)
         )
 
         inventory = cursor.fetchall()
