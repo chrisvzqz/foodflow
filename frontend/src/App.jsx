@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { query, request } from './api'
 import { formatQuantity, locations } from './format'
 import OperationDialog from './OperationDialog'
+import MovementHistory from './MovementHistory'
 import './App.css'
 
 function Mark() {
   return <svg width="29" height="29" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M25 5C13 4 5 11 8 20c3 9 18 7 17-15Z" fill="currentColor"/><path d="M6 28 21 11M13 20l-1-7m5 3h6" stroke="var(--surface)" strokeWidth="1.8" strokeLinecap="round"/></svg>
 }
-const views = { inventory: 'Inventario', products: 'Productos', archived: 'Archivados' }
+const views = { inventory: 'Inventario', products: 'Productos', archived: 'Archivados', history: 'Historial' }
 
 export default function App() {
   const [theme, setTheme] = useState(() => document.documentElement.dataset.theme || 'light')
@@ -28,6 +29,7 @@ export default function App() {
   const productsReady = !loading && !loadError
 
   useEffect(() => {
+    if (view === 'history') return
     const controller = new AbortController()
     const path = view === 'inventory'
       ? `/inventory${query(filters)}`
@@ -64,12 +66,13 @@ export default function App() {
       <aside className="sidebar">
         <a href="#" className="brand" onClick={e => { e.preventDefault(); navigate('inventory') }}><Mark /><span>foodflow<span className="brand-dot">.</span></span></a>
         <div className="sidebar-caption">TU COCINA, EN ORDEN</div>
-        <nav aria-label="Navegación principal">{Object.entries(views).map(([key, label], index) => <button key={key} className={view === key ? 'nav-item selected' : 'nav-item'} aria-current={view === key ? 'page' : undefined} onClick={() => navigate(key)}><span className="nav-symbol" aria-hidden="true">{['▦', '◫', '↶'][index]}</span>{label}<span className="nav-arrow" aria-hidden="true">↗</span></button>)}</nav>
+        <nav aria-label="Navegación principal">{Object.entries(views).map(([key, label], index) => <button key={key} className={view === key ? 'nav-item selected' : 'nav-item'} aria-current={view === key ? 'page' : undefined} onClick={() => navigate(key)}><span className="nav-symbol" aria-hidden="true">{['▦', '◫', '↶', '◷'][index]}</span>{label}<span className="nav-arrow" aria-hidden="true">↗</span></button>)}</nav>
         <div className="sidebar-bottom"><span className="small-leaf"><Mark /></span><p>Lo que tienes.<br /><strong>Lo que aprovechas.</strong></p><span className="version">INVENTARIO DEL HOGAR · V0</span></div>
       </aside>
       <div className="workspace">
         <header className="topbar"><span>Mi hogar <span className="breadcrumb">/ {views[view]}</span></span><div className="topbar-actions"><button className="theme-toggle" aria-pressed={theme === 'dark'} onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}><span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span> {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}</button><span className="home-badge"><span /> Mi cocina</span></div></header>
         <main>
+          {view === 'history' ? <MovementHistory /> : <>
           <div className="page-heading"><div><p className="eyebrow">MENOS DESPERDICIO, MÁS CONTROL</p><h1>{view === 'inventory' ? 'Tu cocina, de un vistazo.' : view === 'products' ? 'Tus alimentos.' : 'Una pausa, no un adiós.'}</h1><p className="subtitle">{view === 'inventory' ? 'Todo lo que tienes y dónde lo guardas. Listo para aprovecharlo.' : view === 'products' ? 'Gestiona tus productos, también los que todavía no tienen existencias.' : 'Conserva su historia y recupéralos cuando vuelvan a tu cocina.'}</p></div>
             <button className="button primary add-button" onClick={() => open('add')} disabled={!productsReady || loading}><span aria-hidden="true">＋</span> Añadir alimentos</button>
           </div>
@@ -103,6 +106,7 @@ export default function App() {
             <footer className="list-footer"><span>Un lugar para cada alimento.</span><span>Nevera · Congelador · Despensa</span></footer>
           </section>
           <p className="page-footnote">Pequeños hábitos. Una cocina que aprovecha más.</p>
+          </>}
         </main>
       </div>
       {operation && <OperationDialog key={`${operation.type}-${operation.item?.inventory_item_id || operation.item?.id || 'new'}`} operation={operation} products={products} onClose={() => setOperation(null)} onSaved={saved} />}
