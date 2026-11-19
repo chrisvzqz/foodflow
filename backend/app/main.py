@@ -3,7 +3,7 @@ from psycopg import Connection
 
 from app.database import get_connection
 
-from app.schemas import ProductCreate, ProductResponse, ProductUpdate, InventoryItemResponse, InventoryEntryCreate, InventoryConsumptionCreate, InventoryWasteCreate, InventoryAdjustmentCreate, InventoryTransferCreate, InventoryTransferResponse
+from app.schemas import ProductCreate, ProductResponse, ProductUpdate, InventoryItemResponse, InventoryEntryCreate, InventoryConsumptionCreate, InventoryWasteCreate, InventoryAdjustmentCreate, InventoryTransferCreate, InventoryTransferResponse, InventoryMovementResponse
 from typing import Literal
 
 app = FastAPI()
@@ -597,3 +597,51 @@ def create_inventory_transfer(transfer: InventoryTransferCreate, connection: Con
             "quantity": destination_item[3]
         }
     }
+
+
+@app.get("/inventory/movements", response_model=list[InventoryMovementResponse])
+def get_inventory_movements(product_id: int | None = None, type: Literal["entry", "consumption", "waste", "adjustment", "transfer_in", "transfer_out"] | None = None, connection: Connection = Depends(get_connection)):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT
+                m.id,
+                m.inventory_item_id,
+                i.product_id,
+                p.name,
+                p.unit,
+                i.location,
+                m.type,
+                m.quantity_change,
+                m.created_at
+            FROM inventory_movements AS m
+            INNER JOIN inventory_items AS i
+                ON m.inventory_item_id = i.id
+            INNER JOIN products AS p
+                ON i.product_id = p.id
+            WHERE (%s::bigint IS NULL OR i.product_id = %s) AND (%s::text IS NULL OR m.type = %s)
+            ORDER BY m.created_at DESC, m.id DESC
+            """,
+            (product_id, product_id, type, type)
+        )
+
+        movements = cursor.fetchall()
+
+    movements_response = []
+
+    for row in movements:
+        row_movement = {
+            "id": row[0],
+            "inventory_item_id": row[1],
+            "product_id": row[2],
+            "name": row[3],
+            "unit": row[4],
+            "location": row[5],
+            "type": row[6],
+            "quantity_change": row[7],
+            "created_at": row[8]
+        }
+        movements_response.append(row_movement)
+
+    return movements_response
+

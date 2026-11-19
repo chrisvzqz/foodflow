@@ -71,3 +71,14 @@ class InventoryTransferCreate(BaseModel):
 class InventoryTransferResponse(BaseModel):
     source: InventoryItemResponse
     destination: InventoryItemResponse
+
+class InventoryMovementResponse(BaseModel):
+    id: int
+    inventory_item_id: int
+    product_id: int
+    name: str
+    unit: str
+    location: Literal["fridge", "freezer", "pantry"]
+    type: Literal["entry", "consumption", "waste", "adjustment", "transfer_in", "transfer_out"]
+    quantity_change: Decimal
+    created_at: datetime
