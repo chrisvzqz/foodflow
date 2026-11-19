@@ -70,3 +70,19 @@
   .theme-toggle { font-size: 10px; }
   :root[data-theme="dark"] td::before { color: #abbca9; }
 }
+
+.history-filters { align-items: flex-end; flex-wrap: wrap; }
+.history-filters label { flex: 1; min-width: 180px; font-size: 12px; color: var(--muted); }
+.history-filters select { margin-top: 8px; }
+.history-table time { white-space: nowrap; font-size: 11px; }
+.movement-change.positive { color: #326b40; }
+.movement-change.negative { color: #a14335; }
+:root[data-theme="dark"] .movement-change.positive { color: #a4d9a1; }
+:root[data-theme="dark"] .movement-change.negative { color: #ffb5a6; }
+@media(max-width:760px) {
+  .sidebar nav { flex-wrap: wrap; }
+  .nav-item { min-width: 40%; }
+  .history-filters label { min-width: 0; flex-basis: 100%; }
+  .history-table td:last-child { grid-column: 1/-1; }
+  .history-table td:last-child::before { content: attr(data-label); display: block; font-size: 9px; margin-bottom: 7px; color: var(--muted); }
+}

@@ -44,8 +44,10 @@ npm run build
 
 Para probar la integración: crear un producto de prueba con existencias, consumir o desperdiciar parte, ajustar el total, trasladar entre ubicaciones y comprobar los listados. Archivar con cantidad positiva debe mostrar el error de la API; tras dejar todas las ubicaciones a cero debe poder archivarse y restaurarse. Las operaciones válidas modifican PostgreSQL y su historial; no deben repetirse sin tener en cuenta sus cantidades.
 
-`npm run build` genera `dist/`. El proxy es de desarrollo: para publicar el frontend, el servidor de despliegue deberá enrutar `/api` a FastAPI. No se ha configurado hosting ni autenticación. El historial de movimientos se conserva en el backend; no hay un endpoint de consulta del historial en esta versión.
+`npm run build` genera `dist/`. El proxy es de desarrollo: para publicar el frontend, el servidor de despliegue deberá enrutar `/api` a FastAPI. No se ha configurado hosting ni autenticación. La vista Historial consulta GET /inventory/movements, con filtros por producto y tipo. Incluye productos archivados, cantidades con signo y fechas en la zona horaria del navegador. Cada traslado muestra dos movimientos. Los nombres y unidades son los actuales del producto, no una copia de sus valores históricos. El endpoint actualmente devuelve todos los resultados sin paginación.
 
 ## Tema
 
 El botón de la barra superior alterna modo claro y oscuro. La elección se recuerda en este navegador mediante localStorage; sin elección previa se utiliza el tema del sistema al abrir. No se guardan datos de inventario en ese almacenamiento.
+
+Para probar Historial: abrir la vista, filtrar por producto (también archivado), por tipo y combinar ambos. Limpiar filtros debe recuperar todos los movimientos; una combinación sin coincidencias muestra una lista vacía. Comparar el primer movimiento y los signos con Swagger.
